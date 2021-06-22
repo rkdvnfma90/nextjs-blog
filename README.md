@@ -313,4 +313,98 @@ export default function App({ Component, pageProps }) {
 <br/>
 <br/>
 
-### Polishing Layout
+### Styling Tips
+
+<br/>
+<br/>
+
+스타일링 할때 도움되는 몇가지 팁!
+
+1. `classnames` 라이브러리 사용
+
+   - `classnames`은 클래스 이름을 쉽게 변경할 수 있는 간단한 라이브러리이다.
+   - `$ npm i classnames` 명령어로 설치할 수 있다.
+   - 자세한 [classnames 사용방법](https://github.com/JedWatson/classnames)
+   - 만약 성공이나 오류 타입만을 허용하는 Alert 컴포넌트를 생성한다고 해보자.
+   - 성공일 경우 `녹색`, 오류일 경우 `적색`으로 지정할 것이다.
+
+```css
+.success {
+  color: green;
+}
+.error {
+  color: red;
+}
+```
+
+```javascript
+import styles from './alert.module.css';
+import cn from 'classnames';
+
+export default function Alert({ children, type }) {
+  return (
+    <div
+      className={cn({
+        [styles.success]: type === 'success',
+        [styles.error]: type === 'error',
+      })}
+    >
+      {children}
+    </div>
+  );
+}
+```
+
+2. PostCSS config 커스터마이징
+
+   - Next.js는 config없이 바로 사용할 수 있는 PostCSS를 사용하여 CSS를 컴파일 한다.
+   - 커스터마이징 하려면 루트디렉토리에 `postcss.config.js` 라는 설정파일을 만들면 된다. `Tailwind CSS`같은 라이브러리를 사용하는 경우 유용하다.
+
+<br/>
+
+3. `Tailwind CSS`
+
+   - Next.js에서 Tailwind CSS를 사용하기 위해선 Next.js의 기본 동작과 일치하도록 `postcss-preset-env`와 `postcss-flexbugs-fixes`를 설치하는 것이 좋다.
+   - `$ npm i tailwindcss postcss-preset-env postcss-flexbugs-fixes` 명령어로 해당 라이브러리들을 설치하자.
+   - `postcss.config.js` 파일은 아래와 같이 작성하자.
+
+   ```javascript
+   module.exports = {
+     plugins: [
+       'tailwindcss',
+       'postcss-flexbugs-fixes',
+       [
+         'postcss-preset-env',
+         {
+           autoprefixer: {
+             flexbox: 'no-2009',
+           },
+           stage: 3,
+           features: {
+             'custom-properties': false,
+           },
+         },
+       ],
+     ],
+   };
+   ```
+
+   - 사용하지 않는 CSS를 tailwind가 무시하도록 `purge`옵션을 아래와 같이 `tailwind.config.js` 파일에 작성한다.
+
+   ```javascript
+   module.exports = {
+     purge: [
+       // Use *.tsx if using TypeScript
+       './pages/**/*.js',
+       './components/**/*.js',
+     ],
+     // ...
+   };
+   ```
+
+<br/>
+
+4. `Sass` 사용
+   - Next.js는 기본적으로 `.scss` `.sass` 파일을 import 하여 사용할 수 있다.
+   - 기본으로 내장되어 있는 `Sass`를 사용하려면 먼저 `$ npm i sass` 로 설치 해야한다.
+   - CSS 모듈과 마찬가지로 파일 명은 `.module.scss` 또는 `.module.sass`로 사용하면 된다.
