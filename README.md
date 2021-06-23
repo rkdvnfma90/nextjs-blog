@@ -408,3 +408,438 @@ export default function Alert({ children, type }) {
    - Next.js는 기본적으로 `.scss` `.sass` 파일을 import 하여 사용할 수 있다.
    - 기본으로 내장되어 있는 `Sass`를 사용하려면 먼저 `$ npm i sass` 로 설치 해야한다.
    - CSS 모듈과 마찬가지로 파일 명은 `.module.scss` 또는 `.module.sass`로 사용하면 된다.
+
+<br/>
+<br/>
+
+---
+
+## Pre-rendering and Data Fetching
+
+여기서는 외부 블로그 데이터를 앱으로 가져오는 방법에 대해 알아볼 것이다. 먼저 블로그 컨텐츠를 파일 시스템에 저장할 것이고, 컨텐츠가 다른 곳 (DB, Headless CMS)에 저장되면 작동한다.
+
+<br/>
+
+### Pre-rendering
+
+<br/>
+<br/>
+
+데이터 가져오기에 대해 알아보기 전에 Next.js에서 가장 중요한 개념중 하나인 `Pre-rendering`에 대해 알아보자.
+
+Next.js는 기본적으로 모든 페이지를 미리 렌더링 한다. 즉, 클라이언트 측인 Javascript에서 모든 작업을 하는 대신 각 페이지에 대해 미리 HTML을 생성한다. 그래서 Pre-rendering은 더 나은 성능과 SEO에서 이점을 얻을 수 있다.
+
+이렇게 생성된 HTML은 해당 페이지에 필요한 최소한의 Javascript 코드와 연결된다. 브라우저에서 페이지 로드가 완료되면 Javascript 코드가 실행된다. 이 과정을 `hydration (서버사이드 렌더링으로 만들어진 정적인 HTML과 State에 동적인 상태를 변화 시키는 행위)` 라고 한다.
+
+<br/>
+<br/>
+
+### Check That Pre-rendering Is Happening
+
+<br/>
+<br/>
+
+다음의 단계를 통해 `Pre-rendering`이 발생하는지 확인할 수 있다.
+
+1. 브라우저에서 자바스크립트를 비활성화 한다. [이곳](https://www.itworld.co.kr/news/108684)에서 방법을 확인할 수 있다.
+2. [이 페이지](https://next-learn-starter.vercel.app/)에 접속해본다.
+
+그럼 어플리케이션이 자바스크립트 없이 렌더링 된 것을 볼수있다. 그 이유는 Next.js가 어플리케이션을 정적 HTML로 사전 렌더링 하여 자바스크립트를 실행하지 않고도 UI를 볼 수 있기 때문이다.
+
+Next.js가 없는 일반 React.js 어플리케이션의 경우 사전 렌더링이 없으므로 자바스크립트를 사용중지하면 볼 수 없다.
+
+<br/>
+<br/>
+
+### Two Forms of Pre-rendering
+
+<br/>
+<br/>
+
+Next.js는 `Static Generation`와 `Server-side Rendering` 두가지 형태의 사전렌더링이 있다. 이 둘의 차이점은 페이지에 대한 HTML을 생성할 때이다.
+
+- Static Generation : 빌드할 때 HTML을 생성하는 사전 렌더링 방법이다. 그 다음 미리 렌더링 된 HTML이 각 요청에서 재사용 된다.
+
+<br/>
+
+![static-generation](https://nextjs.org/static/images/learn/data-fetching/static-generation.png)
+
+<br/>
+<br/>
+
+- Server-side Rendering : 각 요청에 대해 HTML을 생성하는 방법이다.
+
+<br/>
+
+![server-side-rendering](https://nextjs.org/static/images/learn/data-fetching/server-side-rendering.png)
+
+개발 모드 (npm run dev, yarn dev로 실행)에서 모든 페이지는 Static Generation를 사용하는 페이지의 경우에도 각 요청에 대해 사전 렌더링 된다.
+
+<br/>
+<br/>
+
+### Per-page Basis
+
+<br/>
+<br/>
+
+중요한 것은 Next.js를 사용하면 각 페이지에 사용할 사전 렌더링 양식을 선택할 수 있다.
+대부분의 페이지에는 Static Generation을 사용하고 다른 페이지에는 Server-side Rendering을 사용하여 `하이브리드 ` Next.js 어플리케이션을 만들 수 있다.
+
+![per-page-basis](https://nextjs.org/static/images/learn/data-fetching/per-page-basis.png)
+
+<br/>
+<br/>
+
+### When to Use Static Generation v.s. Server-side Rendering
+
+<br/>
+<br/>
+
+가능한 Static Generation 방식을 사용하는 것이 좋다. 가능한 경우 페이지를 한번 빌드하고 CDN에서 제공할 수 있기 때문에 서버가 모든 요청에 대해 페이지를 렌더링하는 것보다 훨씬 빠르다.
+
+다음과 같이 다양한 유형의 페이지에 Static Generation를 사용할 수 있다.
+
+- 마케팅 페이지
+- 블로그
+- 이커머스 상품 목록
+- 공식문서
+
+반면 사용자의 요청보다 먼저 페이지를 렌더링할 수 없으면 이 방법은 좋지 않다. 페이지에 자주 업데이트 되는 데이터가 표시되고 요청 시 마다 페이지 내용이 변경될 가능성이 높다면 `Server-side Rendering`을 사용해야 한다.
+
+서버사이드렌더링은 조금 더 느리지만 미리 렌더링 된 페이지는 항상 최신의 상태를 가지고 있다. 또는 사전 렌더링을 건너뛰고 클라이언트 측의 자바스크립트를 사용하여 자주 업데이트 되는 데이터를 채울 수 있다.
+
+> 이 튜토리얼에서는 `Static Generation`에 초점을 맞추고 있다.
+
+<br/>
+<br/>
+
+### Static Generation with and without Data
+
+<br/>
+<br/>
+
+정적 생성은 데이터를 포함하거나 포함하지 않고 진행할 수 있다. 지금까지 만든 페이지들은 외부 데이터를 가져올 필요가없었다. 이러한 페이지는 어플리케이션이 프로덕션용으로 빌드 될 때 자동으로 생성된다.
+
+그러나 일부 페이지의 경우 외부 데이터(파일 시스템 접근, 외부 API 사용, DB) 를 먼저 가져오지 않으면 HTML을 렌더링하지 못할 수도 있다. Next.js는 이 경우 데이터를 사용한 정적 생성을 지원한다.
+
+![with-data](https://nextjs.org/static/images/learn/data-fetching/static-generation-with-data.png)
+
+<br/>
+<br/>
+
+### Static Generation with Data using `getStaticProps`
+
+<br/>
+<br/>
+
+`getStaticProps`는 동적으로 데이터를 가져와 이 값을 페이지에 전달해 줄 수 있다.
+
+- getStaticProps는 프로덕션 빌드시 실행된다.
+- 함수 내에서 외부 데이터를 가져와 페이지에 props로 전달할 수 있다.
+- 개발 모드에서는 각 요청에서 실행된다.
+
+```javascript
+export default function Home(props) { ... }
+
+export async function getStaticProps() {
+  // Get external data from the file system, API, DB, etc.
+  const data = ...
+
+  // The value of the `props` key will be
+  //  passed to the `Home` component
+  return {
+    props: ...
+  }
+}
+```
+
+기본적으로 `getStaticProps`를 사용하면 Next.js에 다음과 같이 말할 수 있다.
+
+> 이 페이지는 데이터 종속성이 있으니 빌드시 이 페이지를 사전 렌더링 할 때는 먼저 해결해야 한다.
+
+<br/>
+<br/>
+
+### Blog Data
+
+<br/>
+<br/>
+
+먼저 파일 시스템을 사용하여 어플리케이션에 블로그 데이터를 추가해보겠다. 블로그 게시물은 마크다운 파일이 된다.
+
+- 먼저 루트디렉토리에 `posts`라는 폴더를 생성한다. (pages/posts 와는 별개임)
+- 해당 폴더안에 `pre-rendering.md`와 `ssg-ssr.md` 두 파일을 생성한다.
+
+<br/>
+
+`pre-rendering.md`
+
+```text
+---
+title: 'Two Forms of Pre-rendering'
+date: '2020-01-01'
+---
+
+Next.js has two forms of pre-rendering: **Static Generation** and **Server-side Rendering**. The difference is in **when** it generates the HTML for a page.
+
+- **Static Generation** is the pre-rendering method that generates the HTML at **build time**. The pre-rendered HTML is then _reused_ on each request.
+- **Server-side Rendering** is the pre-rendering method that generates the HTML on **each request**.
+
+Importantly, Next.js lets you **choose** which pre-rendering form to use for each page. You can create a "hybrid" Next.js app by using Static Generation for most pages and using Server-side Rendering for others.
+```
+
+`ssg-ssr.md`
+
+```text
+---
+title: 'When to Use Static Generation v.s. Server-side Rendering'
+date: '2020-01-02'
+---
+
+We recommend using **Static Generation** (with and without data) whenever possible because your page can be built once and served by CDN, which makes it much faster than having a server render the page on every request.
+
+You can use Static Generation for many types of pages, including:
+
+- Marketing pages
+- Blog posts
+- E-commerce product listings
+- Help and documentation
+
+You should ask yourself: "Can I pre-render this page **ahead** of a user's request?" If the answer is yes, then you should choose Static Generation.
+
+On the other hand, Static Generation is **not** a good idea if you cannot pre-render a page ahead of a user's request. Maybe your page shows frequently updated data, and the page content changes on every request.
+
+In that case, you can use **Server-Side Rendering**. It will be slower, but the pre-rendered page will always be up-to-date. Or you can skip pre-rendering and use client-side JavaScript to populate data.
+```
+
+> 각 마크다운 파일 맨 위에 제목과 날짜가 포함된 메타데이터 섹션이 있는것을 알 수 있다. 이 것을 `YAML Front Matter`라고 하며 `gray-matter`라는 라이브러리를 사용하여 구문 분석을 할 수 있다.
+
+<br/>
+<br/>
+
+### Parsing the Blog Data on getStaticProps
+
+<br/>
+<br/>
+
+이제 이 데이터를 사용하여 `pages/index.js` 를 업데이트 해보도록 하겠다.
+사전 렌더링에서 이를 수행하려면 `getStaticProps`를 구현해야 한다.
+
+![get-static-props](https://nextjs.org/static/images/learn/data-fetching/index-page.png)
+
+먼저 마크다운에서 메타 데이터를 파싱할 수 있는 `gray-matter` 라이브러리를 설치한다.
+
+`$ npm i gray-matter `
+
+그 다음 파일 시스템에서 데이터를 가져오기 위한 간단한 라이브러리를 생성한다.
+루트 디렉토리에 `lib` 폴더 생성 후 `posts.js`파일을 아래와 같이 작성한다.
+
+```javascript
+import fs from 'fs';
+import path from 'path';
+import matter from 'gray-matter';
+
+const postsDirectory = path.join(process.cwd(), 'posts');
+
+export function getSortedPostsData() {
+  // Get file names under /posts
+  const fileNames = fs.readdirSync(postsDirectory);
+  const allPostsData = fileNames.map((fileName) => {
+    // Remove ".md" from file name to get id
+    const id = fileName.replace(/\.md$/, '');
+
+    // Read markdown file as string
+    const fullPath = path.join(postsDirectory, fileName);
+    const fileContents = fs.readFileSync(fullPath, 'utf8');
+
+    // Use gray-matter to parse the post metadata section
+    const matterResult = matter(fileContents);
+
+    // Combine the data with the id
+    return {
+      id,
+      ...matterResult.data,
+    };
+  });
+  // Sort posts by date
+  return allPostsData.sort(({ date: a }, { date: b }) => {
+    if (a < b) {
+      return 1;
+    } else if (a > b) {
+      return -1;
+    } else {
+      return 0;
+    }
+  });
+}
+```
+
+이제 `getSortedPostsData`를 import 하고 `pages/index.js`에서 `getStaticProps`를 호출해야 한다.
+
+`pages/index.js`을 열고 아래와 코드를 추가해주자.
+
+```javascript
+...
+
+import { getSortedPostsData } from '../lib/posts';
+
+export async function getStaticProps() {
+  const allPostsData = getSortedPostsData();
+  return {
+    props: {
+      allPostsData,
+    },
+  };
+}
+
+...
+```
+
+`getStaticProps`의 props 객체 내에서 `allPostsData`를 반환하면 블로그 게시물이 `Home` 컴포넌트의 prop으로 전달된다. 데이터를 확인하기 위해 아래와 같이 변경해보자
+
+```javascript
+export default function Home({ allPostsData }) {
+  return (
+    <Layout home>
+      {/* Keep the existing code here */}
+
+      {/* Add this <section> tag below the existing <section> tag */}
+      <section className={`${utilStyles.headingMd} ${utilStyles.padding1px}`}>
+        <h2 className={utilStyles.headingLg}>Blog</h2>
+        <ul className={utilStyles.list}>
+          {allPostsData.map(({ id, date, title }) => (
+            <li className={utilStyles.listItem} key={id}>
+              {title}
+              <br />
+              {id}
+              <br />
+              {date}
+            </li>
+          ))}
+        </ul>
+      </section>
+    </Layout>
+  );
+}
+```
+
+그럼 사진과 같이 해당 내용을 확인할 수 있을 것이다.
+
+![result](https://nextjs.org/static/images/learn/data-fetching/blog-data.png)
+
+![get-static-props-finish](https://nextjs.org/static/images/learn/data-fetching/index-page.png)
+
+<br/>
+<br/>
+
+### Fetch External API or Query Database
+
+<br/>
+<br/>
+
+`lib/posts.js`에 파일 시스템에서 데이터를 가져오는 `getSortedPostsData`를 구현했다. 하지만 외부 API에서도 데이터를 가져올 수 있다.
+
+```javascript
+export async function getSortedPostsData() {
+  // Instead of the file system,
+  // fetch post data from an external API endpoint
+  const res = await fetch('..');
+  return res.json();
+}
+```
+
+> Next.js는 클라이언트와 서버에서 fetch()를 폴리필 하기 때문에 가져올 필요 없다.
+
+아래와 같이 직접 데이터베이스에서 가져올 수도 있다.
+
+```javascript
+import someDatabaseSDK from 'someDatabaseSDK'
+
+const databaseClient = someDatabaseSDK.createClient(...)
+
+export async function getSortedPostsData() {
+  // Instead of the file system,
+  // fetch post data from a database
+  return databaseClient.query('SELECT posts...')
+}
+```
+
+이는 `getStaticProps`가 서버사이드에서만 실행되기 때문이다. 클라이언트 측에서는 실행되지 않고 브라우저용 자바스크립트 번들에도 포함되지 않는다. 이 의미는 브라우저로 보내지 않고도 직접 데이터베이스 쿼리와 같은 코드를 작성할 수 있다는 뜻이다.
+
+<br/>
+<br/>
+
+### Development vs. Production
+
+<br/>
+<br/>
+
+- `개발 모드`에서 `getStaticProps`는 모든 요청에 대해 실행된다.
+
+- `운영 모드`에서 `getStaticProps`는 빌드시 실행된다. 하지만 이 동작은 `getStaticPaths`에서 반환된 대체키를 사용하여 향상 될 수 있다.
+
+때문에 빌드시 실행되도록 되어 있으므로 쿼리의 매개변수나 HTTP 헤더와 같이 요청시에만 사용할 수 있는 데이터를 사용할 수 없다.
+
+- `getStaticProps`는 `page`에서만 export될 수 있다. 페이지가 아닌 파일에서는 export 할 수 없다.
+
+<br/>
+<br/>
+
+### What If I Need to Fetch Data at Request Time?
+
+<br/>
+<br/>
+
+만약 요청시 데이터를 가져와야하는 경우엔 어떻게 해야 할까?
+사용자의 요청에 앞서 페이지를 미리 렌더링 할 수 없는 경우 정적 생성은 좋은 방법이 아니다. 이 경우 서버사이드 렌더링을 시도하거나 사전 렌더링을 건너 뛸 수 있다.
+
+빌드시가 아니라 요청시 데이터를 가져와야 하는 경우 서버사이드 렌더링을 시도할 수 있다.
+
+![server-side-rendering](https://nextjs.org/static/images/learn/data-fetching/server-side-rendering-with-data.png)
+
+서버사이드 렌더링을 사용하려면 페이지에서 `getStaticProps` 대신 `getServerSideProps`를 export 해야 한다.
+
+```javascript
+export async function getServerSideProps(context) {
+  return {
+    props: {
+      // props for your component
+    },
+  };
+}
+```
+
+`getServerSideProps`는 요청 시 호출되므로 해당 매개변수 (context)에 요청 관련 매개변수가 포함된다.
+
+<br/>
+<br/>
+
+### Client-side Rendering
+
+<br/>
+<br/>
+
+사전 렌더링할 필요가 없는 경우 클라이언트 사이드 렌더링을 사용할 수 있다.
+
+![client-side-rendering](https://nextjs.org/static/images/learn/data-fetching/client-side-rendering.png)
+
+보통 사용자 대시보드 페이지에 적합하다. 그 이유는 대시보드 페이지는 비공개 사용자 별 페이지 이므로 SEO는 관련이 없기 때문이다.
+
+Next.js 팀은 데이터를 가져오기 위해 `SWR` 이라는 React 훅을 만들었다. 이 는 클라이언트 측에서 데이터를 가져 오는 경우 `적극 권장`하는 방법이다.
+
+캐싱, 재검증, 포커스 추적, refetching 등등 여기서 자세한 내용은 다루지는 않지만 아래와 같이 사용한다.
+
+```javascript
+import useSWR from 'swr';
+
+function Profile() {
+  const { data, error } = useSWR('/api/user', fetch);
+
+  if (error) return <div>failed to load</div>;
+  if (!data) return <div>loading...</div>;
+  return <div>hello {data.name}!</div>;
+}
+```
+
+[SWR 관련 문서](https://swr.vercel.app/)에서 자세한 내용을 확인하길 바란다.
