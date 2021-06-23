@@ -843,3 +843,400 @@ function Profile() {
 ```
 
 [SWR 관련 문서](https://swr.vercel.app/)에서 자세한 내용을 확인하길 바란다.
+
+<br/>
+<br/>
+
+### Page Path Depends on External Data
+
+<br/>
+<br/>
+
+이제 각 페이지의 경로가 외부 데이터에 의존하는 경우에 대해 설명하도록 하겠다. (동적 라우팅)
+
+![dynamic-routing](https://nextjs.org/static/images/learn/dynamic-routes/page-path-external-data.png)
+
+동적 라우팅을 사용하여 페이지를 정적으로 생성하는 방법에 대해 알아보자. 예제로 블로그 게시물에 대한 동적 라우팅을 만들려고 한다.
+
+- 각 게시물에 `/posts/<id>` 경로를 지정한다. 여기서 `<id>`는 루트디렉토리의 `posts`경로 안에 있는 마크다운 파일의 이름이다.
+- 이미 `pre-rendering.md`와 `ssg-ssr.md`가 있기 때문에 각각의 경로는 `pre-rendering.md`와 `posts/ssg-ssr`가 된다.
+
+먼저 `pages/posts` 아래에 `[id].js`라는 페이지를 만든다. 여기서 `[`로 시작하고 `]`로 끝나는 페이지는 Next.js의 동적 라우팅이라고 보면 된다.
+
+```javascript
+import Layout from '../../components/layout';
+
+export default function Post() {
+  return <Layout>...</Layout>;
+}
+
+export async function getStaticPaths() {
+  // Return a list of possible value for id
+}
+
+export async function getStaticProps({ params }) {
+  // Fetch necessary data for the blog post using params.id
+}
+```
+
+여기서 비동기 함수인 `getStaticPaths`를 export한다. 이 함수 내부에서 `id`에 사용할 수 있는 값 목록을 리턴해야 한다.
+
+마지막으로 `getStaticProps`를 다시 구현해야 하는데 이번에는 지정된 ID로 블로그 게시물에 필요한 데이터를 가져온다. `getStaticProps`에는 id를 포함하는 params가 제공된다. (파일 이름이 `[id].js` 이기 때문)
+
+![dynamic-routes](https://nextjs.org/static/images/learn/dynamic-routes/how-to-dynamic-routes.png)
+
+<br/>
+<br/>
+
+### Implement getStaticPaths
+
+<br/>
+<br/>
+
+먼저 `lib/posts.js`파일 하단에 아래 코드를 추가해준다. `getAllPostIds` 함수는 posts 디렉토리의 파일 이름(.md 확장자 제외한 이름) 목록을 반환한다.
+
+```javascript
+export function getAllPostIds() {
+  const fileNames = fs.readdirSync(postsDirectory);
+
+  // Returns an array that looks like this:
+  // [
+  //   {
+  //     params: {
+  //       id: 'ssg-ssr'
+  //     }
+  //   },
+  //   {
+  //     params: {
+  //       id: 'pre-rendering'
+  //     }
+  //   }
+  // ]
+  return fileNames.map((fileName) => {
+    return {
+      params: {
+        id: fileName.replace(/\.md$/, ''),
+      },
+    };
+  });
+}
+```
+
+> 주의사항 : 반환 된 목록은 단순한 문자열 배열이 아니라 위의 주석처럼 `객체 배열`이어야 한다. 각 객체에는 `params` 키가 있어야 하며 `id`가 있는 객체를 포함해야 한다. (파일 이름에 `[id]`를 사용하고 있기 때문) 그렇지 않으면 `getStaticPaths`가 실패한다.
+
+마지막으로 `getAllPostIds`함수를 가져와서 `getStaticPaths` 함수 내에서 사용한다. `pages/posts/[id].js` 파일을 열고 아래와 같이 수정해주자.
+
+```javascript
+...
+
+import { getAllPostIds } from '../../lib/posts';
+
+export async function getStaticPaths() {
+  const paths = getAllPostIds();
+  return {
+    paths,
+    fallback: false,
+  };
+}
+
+...
+```
+
+`paths`에는 `getAllPostIds()`에서 반환된 경로의 배열이 포함된다. 여기에는 `pages/posts/[id].js`에 정의 된 매개변수가 포함된다.
+
+이제 거의 완료되었고 `getStaticProps`도 마저 구현해야 한다.
+
+<br/>
+<br/>
+
+### Implement getStaticProps
+
+<br/>
+<br/>
+
+주어진 ID로 게시물을 렌더링 하기 위해 필요한 데이터를 가져와야 한다.
+
+`lib/posts.js`를 열고 하단에 다음 `getPostData`함수를 추가한다. 이 함수는 ID를 기반으로 게시물 데이터를 반환한다.
+
+```javascript
+export function getPostData(id) {
+  const fullPath = path.join(postsDirectory, `${id}.md`);
+  const fileContents = fs.readFileSync(fullPath, 'utf8');
+
+  // Use gray-matter to parse the post metadata section
+  const matterResult = matter(fileContents);
+
+  // Combine the data with the id
+  return {
+    id,
+    ...matterResult.data,
+  };
+}
+```
+
+그 다음 `pages/posts/[id].js`파일을 열고 아래와 같이 변경해 주자.
+
+```javascript
+...
+
+import { getAllPostIds, getPostData } from '../../lib/posts'
+
+export async function getStaticProps({ params }) {
+  const postData = getPostData(params.id)
+  return {
+    props: {
+      postData
+    }
+  }
+}
+
+...
+```
+
+이제 post 페이지는 `getStaticProps`의 `getPostData`함수를 사용하여 게시물 데이터를 가져와서 prop으로 반환한다.
+
+이제 postData를 사용하도록 Post 컴포넌트를 수정하겠다. `pages/posts/[id].js`에서 내보낸 Post 컴포넌트를 아래 코드로 변경한다.
+
+```javascript
+export default function Post({ postData }) {
+  return (
+    <Layout>
+      {postData.title}
+      <br />
+      {postData.id}
+      <br />
+      {postData.date}
+    </Layout>
+  );
+}
+```
+
+아래의 주소로 접속하여 각각 확인해 보면 잘 출력되는 것을 알 수 있다.
+
+- http://localhost:3000/posts/ssg-ssr
+- http://localhost:3000/posts/pre-rendering
+
+![d-r-finish](https://nextjs.org/static/images/learn/dynamic-routes/how-to-dynamic-routes.png)
+
+<br/>
+<br/>
+
+### Render Markdown
+
+<br/>
+<br/>
+
+마크다운 컨텐츠를 렌더링 하기 위해 `remark` 라이브러리가 필요하므로 설치한다.
+
+`$ npm i remark remark-html`
+
+그 후 `lib/posts.js`파일 상단에 아래 코드를 추가하고 `getPostsData()` 함수를 수정해 주자
+
+```javascript
+...
+
+import remark from 'remark';
+import html from 'remark-html';
+
+...
+
+export function getPostData(id) {
+  const fullPath = path.join(postsDirectory, `${id}.md`);
+  const fileContents = fs.readFileSync(fullPath, 'utf8');
+
+  // Use gray-matter to parse the post metadata section
+  const matterResult = matter(fileContents);
+
+  // Use remark to convert markdown into HTML string
+  const processedContent = await remark()
+    .use(html)
+    .process(matterResult.content);
+
+  const contentHtml = processedContent.toString();
+
+  // Combine the data with the id
+  return {
+    id,
+    contentHtml,
+    ...matterResult.data,
+  };
+}
+```
+
+비동기로 데이터를 가져오기 위해 `pages/posts/[id].js` 파일의 `getPostData` 함수에 `await`키워드를 사용한다.
+
+마지막으로 Post 컴포넌트를 `dangerouslySetInnerHTML` 사용하여 `contentHtml` 사용하도록 업데이트 한다.
+
+```javascript
+export default function Post({ postData }) {
+  return (
+    <Layout>
+      {postData.title}
+      <br />
+      {postData.id}
+      <br />
+      {postData.date}
+      <br />
+      <div dangerouslySetInnerHTML={{ __html: postData.contentHtml }} />
+    </Layout>
+  );
+}
+```
+
+다시 아래 경로로 접속하여 확인해보면 마크다운이 잘 파싱된 것을 볼 수 있다.
+
+- http://localhost:3000/posts/ssg-ssr
+- http://localhost:3000/posts/pre-rendering
+
+[동적 라우팅](https://nextjs.org/docs/routing/dynamic-routes)에 자세한 내용은 공식문서에서 확인 하길 바란다.
+
+<br/>
+<br/>
+
+### Fetch External API or Query Database
+
+<br/>
+<br/>
+
+`getStaticProps`와 마찬가지로 `getStaticPaths`는 모든 데이터 소스에서 데이터를 가져올 수 있다. 여태 만들었던 예제에서는 `getAllPostIds` (getStaticPaths 에서 사용됨)는 외부 API를 아래와 같이 사용할 수 있다.
+
+```javascript
+export async function getAllPostIds() {
+  // Instead of the file system,
+  // fetch post data from an external API endpoint
+  const res = await fetch('..');
+  const posts = await res.json();
+  return posts.map((post) => {
+    return {
+      params: {
+        id: post.id,
+      },
+    };
+  });
+}
+```
+
+`getStaticPaths` 또한 개발 모드에서는 요청이 있을 때 마다 실행되고, 운영 모드에서는 빌드시 실행된다.
+
+`getStaticPaths` 에서 `fallback: false`는 무슨 의미를 뜻 할까? 바로 `getStaticPaths`에서 반환하지 않는 경로는 404 페이지가 된다.
+
+`fallback: true`일 경우 `getStaticProps`의 동작이 아래와 같이 변한다.
+
+- getStaticPaths에서 반환된 경로는 빌드시 HMTL로 렌더링 된다.
+- 빌드시 생성되지 않는 경로는 404 페이지를 생성하지 않는다. 대신 Next.js는 이러한 경로에 대한 첫 번째 요청시 페이지의 `fallback` 버전을 제공한다.
+- 백그라운드에서 Next.js는 요청 된 경로를 정적으로 생성한다.
+
+`fallback: blocking`일 경우 새 경로는 `getStaticProps`로 서버사이드 렌더링 되고 향후 요청을 위해 캐시되므로 경로당 한 번 발생한다.
+
+<br/>
+<br/>
+
+### 404 pages
+
+404 페이지는 `pages/404.js`에 생성하면 되고, 빌드시 정적으로 생성된다.
+
+<br/>
+<br/>
+
+---
+
+## API Routes
+
+<br/>
+
+### Creating API Routes
+
+API 라우트를 사용하면 Next.js 어플리케이션 내부에 API 엔드 포인트를 만들 수 있다. 다음과 같은 형식의 `pages/api` 디렉토리내에 함수를 생성하면 된다. 이것은 서버리스 함수로서 배포할 수 있다. (람다라고도 함)
+
+```javascript
+// req = HTTP incoming message, res = HTTP server response
+export default function handler(req, res) {
+  // ...
+}
+```
+
+자세한 내용은 [공식문서](https://nextjs.org/docs/api-routes/introduction)에서 확인하길 바란다.
+
+<br/>
+<br/>
+
+### Creating a simple API endpoint
+
+<br/>
+<br/>
+
+`pages/api/hello.js` 라는 파일을 아래와 같이 만들어 보자.
+
+```javascript
+export default function handler(req, res) {
+  res.status(200).json({ text: 'Hello' });
+}
+```
+
+그 다음 `http://localhost:3000/api/hello` 에 접속하면 `{"text":"Hello"}`가 출력되는 것을 볼 수 있다.
+
+- req : `http.IncomingMessage`의 미리 빌드 된 인스턴스이다.
+- res : `http.ServerResponse`의 인스턴스 이다. [이곳](https://nextjs.org/docs/api-routes/response-helpers)에서 추가적인 내용을 볼 수 있다.
+
+API Routes의 자세한 내용은 [이곳](https://nextjs.org/docs/api-routes/introduction)에서 확인할 수 있다.
+
+<br/>
+<br/>
+
+### Do Not Fetch an API Route from `getStaticProps` or `getStaticPaths`
+
+<br/>
+<br/>
+
+`getStaticProps` 나 `getStaticPaths`에서 API 라우트를 사용하면 안된다. 대신에 직접 서버 사이드 코드를 작성하거나 헬퍼 함수를 호출해야 한다.
+
+그 이유는 `getStaticProps`, `getStaticPaths`는 서버사이드 에서만 실행되고 클라이언트 사이드에서는 실행되지 않기 때문이다. 그래서 브라우저용 자바스크립트 번들에도 포함되지 않는다.
+
+<br/>
+
+**좋은 사용의 예**
+
+보통 Form 입력값을 처리할 때 사용한다. 예를들어 페이지에서 Form을 생성하고 API에 POST 요청을 보낼 때 사용한다. 그 다음 코드를 작성하여 데이터베이스에 직접 저장할 수 있다. API 라우트는 클라이언트 번들의 일부가 아니기 때문에 서버 사이드 코드를 안전하게 작성할 수 있다.
+
+```javascript
+export default function handler(req, res) {
+  const email = req.body.email;
+  // Then save email to your database, etc...
+}
+```
+
+---
+
+## Deploying Your Next.js App
+
+<br/>
+
+Vercel에 Next.js 어플리케이션 배포하는 방법을 알아보도록 하자
+
+<br/>
+
+### Push to GitHub
+
+배포하기 전에 어플리케이션을 Github에 푸시하자.
+저장소는 public이나 private일 수 있다.
+
+```git
+git remote add origin https://github.com/<username>/nextjs-blog.git
+git push -u origin main
+```
+
+<br/>
+<br/>
+
+### Deploy to Vercel
+
+<br/>
+<br/>
+
+Next.js를 프로덕션에 배포하는 가장 쉬운 방법은 Next.js를 제작자가 개발한 `Vercel` 플랫폼을 사용하는 것이다. 무료로 사용할 수 있다!
+
+1. 먼저 Vercel 계정이 없다면 [이곳](https://vercel.com/signup)에서 계정을 만들자
+2. 지금 만든 `nextjs-blog` 저장소를 [이곳](https://vercel.com/new)에서 import 하자.
+3. import 하면 설정할 수 있는 항목들이 있는데 Vecel이 Next.js가 있음을 감지하고 최적의 빌드 설정을 자동으로 선택해 준다.
+4. 배포하면 Next.js 어플리케이션 빌드가 시작되고 1분 이내 완료 된다.
+5. 배포가 완료되면 URL을 받게 된다. 이 URL을 클릭하면 시작 페이지가 라이브로 표시된다.
